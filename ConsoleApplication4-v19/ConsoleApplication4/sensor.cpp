@@ -4,27 +4,17 @@
  const char*sensor:: DIVIDER = "1";
 //functions
 
+  sensor::sensor(string serial) {
+	  serial_device = serial;
+ }
 //useage: gives necessary information about programs usage.
-void sensor:: usage(const char *prog) {
-
-	printf("\n usage : %s \"Mode name\"  \"serial port list \"  \n\t ex) $ %s train COM3\n\n", prog, prog);
-	printf("\tMode name can be \"train\" or \"test\" \n\n"); //testing is explained as recognition mode in the SRS 
-															 // There could be a third mode to reach the functions.Ex: Settings
-}  
 
 void sensor::handle_error(const char* error_msg)
 {
 	fprintf(stderr, "ERROR: %s\n", error_msg);
 	exit(1);
 }
-
-void sensor::read_serial_devices_from_command_line(std::vector<std::string>& args, std::vector<std::string>& serial_device_list)
-{
-	for (size_t i = 1; i<args.size(); i++) {
-		serial_device_list.push_back(args[i]);
-	}
-}
-void sensor::calibration(const char* serial_device,int baudrate, double calibration[3])
+void sensor::calibration(int baudrate, double calibration[3])
 {
 	MyAhrsPlus sensor;
 	SensorData sensor_data;
@@ -75,7 +65,7 @@ void sensor::calibration(const char* serial_device,int baudrate, double calibrat
 	}
 
 }
-int sensor::syn_read_ascii(const char* serial_device, int baudrate, float euler[][6000],float acc[][6000],double calib[3])
+int sensor::syn_read_ascii( int baudrate, float euler[][6000],float acc[][6000],double calib[3])
 {
 	MyAhrsPlus sensor;
 	SensorData sensor_data;

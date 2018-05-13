@@ -1,15 +1,5 @@
-#include "stdafx.h"
-#include "gesture.h"
-#include <iostream>
 #include "sensor.h"
-#include <chrono>
-#include <thread>
-#include <algorithm>
-#include<math.h>
-#include <fstream>
-#include <string>
-#include <stdlib.h>
-
+#include "gesture.h"
 #ifdef WIN32
 #define NOMINMAX
 #undef min
@@ -21,15 +11,15 @@ using json = nlohmann::json;
 using namespace std;
 #define Count 15
 #define sample 5
-gesture::gesture(double calibration[3]) {
-	sensor Sensor;
+gesture::gesture(double calibration[3], string serial_device) {
+	sensor Sensor(serial_device);
 	int samp_count = 0;
 	if (calibration[0] == 0 && calibration[1] == 0 && calibration[2] == 0)
 	{
 		cout << "Need to calibration.Please make calibration first! You can achieve this by runnig the training mode for the first time !\n";
 		exit(0);
 	}
-	samp_count = Sensor.syn_read_ascii("COM5", Sensor.BAUDRATE, euler, acc,calibration) + 1;
+	samp_count = Sensor.syn_read_ascii(Sensor.BAUDRATE, euler, acc,calibration) + 1;
 	duration = ((double)samp_count) / 100;
 
 	for (int j = 0; j < 3; j++) {
@@ -39,7 +29,7 @@ gesture::gesture(double calibration[3]) {
 	//featureVec[Count*6] = duration;
 	norm(featureVec);
 }
-gesture::gesture(int id,double calibration[3]  ){
+gesture::gesture(int id, double calibration[3], string serial_device) {
 	for  (int i = 0;  i < Count*6;  i++)
 	{
 		featureVec[i] =0 ;
@@ -49,7 +39,7 @@ gesture::gesture(int id,double calibration[3]  ){
 	if(calibration[0]==0 && calibration[1]==0 && calibration[2]==0)
 		//calibration deðerlerini al 
 	{
-		gesture_calib(calibration);
+		gesture_calib(calibration,serial_device);
 
 	}
 	calib[0] = calibration[0];
@@ -63,22 +53,22 @@ gesture::gesture(double *feature, float distance, int id) {
 	gest_id = id;
 
 }
-void gesture::gesture_calib(double calibration[3]) {
+void gesture::gesture_calib(double calibration[3],string serial_dev) {
 
 	cout << "Please dont move the sensor for the calibration.Enter 4 for the calibration\n";
 	string check;
 	cin >> check;
 	if (check == "4")
 	{
-		sensor Sensor;
-		Sensor.calibration("COM5", Sensor.BAUDRATE, calibration);
+		sensor Sensor(serial_dev);
+		Sensor.calibration(Sensor.BAUDRATE, calibration);
 		
 	}
 }
 bool gesture::saveGest() { 
 	try {
 		json j;
-		ifstream f("test.json");
+		ifstream f("gesture.json");
 		if (f.peek() != std::ifstream::traits_type::eof())
 		{
 			f >> j;
@@ -91,7 +81,7 @@ bool gesture::saveGest() {
 			j[s]["id"] = gest_id;
 			j[s]["distance"] = dist;
 			j[s]["featureVec"] = vector<double>(featureVec, featureVec + Count*6);
-			ofstream f2("test.json");
+			ofstream f2("gesture.json");
 			f2 << j;
 			f2.close();
 		
@@ -103,8 +93,8 @@ bool gesture::saveGest() {
 	}
 }
 
-void gesture::detect() {
-	sensor Sensor;
+void gesture::detect(string serial_device) {
+	sensor Sensor(serial_device);
 	double euler_sample_count = 0; 
 	float euler[sample][3][6000];
 	float accel[sample][3][6000];
@@ -124,7 +114,7 @@ void gesture::detect() {
 		if (check=="4")
 		{
 			//taking sensor values
-			euler_sample_count = Sensor.syn_read_ascii("COM5", Sensor.BAUDRATE, euler[i], accel[i],calib) + 1;
+			euler_sample_count = Sensor.syn_read_ascii(Sensor.BAUDRATE, euler[i], accel[i],calib) + 1;
 
 			printf("\n-----------------------------end-----------------------------------of----------------------------------%dth gesture.\n", i + 1);
 
@@ -347,84 +337,85 @@ void gesture::norm(double *feature) {
 		feature[i] = feature[i] /distance;
 	}
 }
-void gesture::compare(int train_gest_count,int delete_count) {
+void gesture::compare(int train_gest_count, int delete_count) {
 	float dist_test_gest = 0;
 
 
 
 	//test.json  dan train gesturelarýný geri yüklüyoruz..
 	vector<gesture> Train_Gest;
-	
-	double feature[Count*6] = { 0 };
-	
+
+	double feature[Count * 6] = { 0 };
+
 	int id;
 	float distance;
 	float dist_to_train;
 	json j;
-	ifstream f("test.json");
+	ifstream f("gesture.json");
 	if (f.peek() == std::ifstream::traits_type::eof())
 	{
 		cout << "No train mode gestures.To use test mode, you should save the gesture in the train mode/n";
 		exit(0);
 	}
-	f >> j;
-	f.close();
-	for (int i = 1; i <= (train_gest_count+delete_count); i++)
-	{
-		string s = "gesture"+to_string(i);
-
-		try{ id = j[s]["id"]; }
-		catch (...) {
-			continue;
-		}
-		for (int k = 0; k < 6*Count; k++)
+	else {
+		f >> j;
+		f.close();
+		for (int i = 1; i <= (train_gest_count + delete_count); i++)
 		{
-			feature[k] = (double)j[s]["featureVec"][k];
-		}
-		
-		distance = j[s]["distance"];
-		Train_Gest.push_back(gesture(feature, distance, id));
-	}
+			string s = "gesture" + to_string(i);
 
-	struct Candidates *cand = (struct Candidates*)malloc(train_gest_count * sizeof(struct Candidates));
-	for (int i = 0; i < train_gest_count; i++)
-	{
-		cand[i].val = 0;
-	}
-	int count_of_candidates = 0;
-	for (int i = 0; i < train_gest_count; i++)
-	{
-		gesture g = Train_Gest.at(i);
-		dist_to_train = calcDistance(g.featureVec);
-		printf("%lf\n",dist_to_train);
-		if (g.dist > dist_to_train) {
-			cand[i].val = 1; cand[i].dist = dist_to_train; count_of_candidates++;
-			cand[i].id = g.getId();
+			try { id = j[s]["id"]; }
+			catch (...) {
+				continue;
+			}
+			for (int k = 0; k < 6 * Count; k++)
+			{
+				feature[k] = (double)j[s]["featureVec"][k];
+			}
+
+			distance = j[s]["distance"];
+			Train_Gest.push_back(gesture(feature, distance, id));
 		}
-	}
-	if (count_of_candidates == 1) {
-		cout << "A match is found for your gesture\n";
+
+		struct Candidates *cand = (struct Candidates*)malloc(train_gest_count * sizeof(struct Candidates));
 		for (int i = 0; i < train_gest_count; i++)
 		{
-			if (cand[i].val == 1)		printf("The id of the gesture is %d and the distance from train feature vector is %f\n", cand[i].id, cand[i].dist);
+			cand[i].val = 0;
 		}
-	}
-	else if (count_of_candidates == 0) { cout << "No match for your gesture\n"; }
-	else { //at least 2
-		struct Candidates min;
-		min.dist = 100000;
+		int count_of_candidates = 0;
 		for (int i = 0; i < train_gest_count; i++)
 		{
-			if (cand[i].val == 1)
-				/*if (min.dist > cand[i].dist)
-				{
-					min.dist = cand[i].dist;
-					min.id = cand[i].id;
-				}*/
-				printf("The id of the gesture is %d and the distance from train feature vector is %f\n", cand[i].id, cand[i].dist);
+			gesture g = Train_Gest.at(i);
+			dist_to_train = calcDistance(g.featureVec);
+			printf("%lf\n", dist_to_train);
+			if (g.dist > dist_to_train) {
+				cand[i].val = 1; cand[i].dist = dist_to_train; count_of_candidates++;
+				cand[i].id = g.getId();
+			}
 		}
+		if (count_of_candidates == 1) {
+			cout << "A match is found for your gesture\n";
+			for (int i = 0; i < train_gest_count; i++)
+			{
+				if (cand[i].val == 1)		printf("The id of the gesture is %d and the distance from train feature vector is %f\n", cand[i].id, cand[i].dist);
+			}
+		}
+		else if (count_of_candidates == 0) { cout << "No match for your gesture\n"; }
+		else { //at least 2
+			struct Candidates min;
+			min.dist = 100000;
+			for (int i = 0; i < train_gest_count; i++)
+			{
+				if (cand[i].val == 1)
+					/*if (min.dist > cand[i].dist)
+					{
+						min.dist = cand[i].dist;
+						min.id = cand[i].id;
+					}*/
+					printf("The id of the gesture is %d and the distance from train feature vector is %f\n", cand[i].id, cand[i].dist);
+			}
 
-		/*printf("The id of the gesture is %d and the distance from train feature vector is %f\n", min.id, min.dist);*/
+			/*printf("The id of the gesture is %d and the distance from train feature vector is %f\n", min.id, min.dist);*/
+		}
 	}
 }
-
