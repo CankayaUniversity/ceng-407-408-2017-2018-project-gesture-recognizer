@@ -1,0 +1,5 @@
+delete ile ilgili hata  tespit edildi ve düzeltildi.
+ivmenin logaritmasý alýnarak kaydedilmeye baþladý.
+
+
+---v16 ve sonrasýnýn update edilmesi için repo nun  historysini silmem gerekti---

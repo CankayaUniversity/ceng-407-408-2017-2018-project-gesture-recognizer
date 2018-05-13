@@ -19,7 +19,7 @@
 
 using json = nlohmann::json;
 using namespace std;
-#define Count 20
+#define Count 15
 #define sample 5
 gesture::gesture(double calibration[3]) {
 	sensor Sensor;
@@ -161,6 +161,18 @@ void gesture::detect() {
 		//holds the feature vector of each sample...
 		copy(interpolated, interpolated + Count*6, feature_arr[i]);
 		//feature_arr[i][Count*6] = ((double)samp_count[i] / 100);
+		float m = 0;
+		int sign = 0;
+		for (int i = 0; i < Count * 3; i++)
+		{
+			m = featureVec[Count * 3 + i];
+			if (m < 0) sign = -1;
+			else if (m >= 0) sign = 1;
+			m = abs(m);
+			featureVec[Count * 3 + i] = sign * log(1 + m);
+
+		}
+
 		norm(feature_arr[i]);
 
 	}
@@ -185,7 +197,8 @@ void gesture::detect() {
 
 	} 
 	mean = mean / sample;
-	dist = max + 0.25*mean;
+	//dist = max + 0.5*mean;
+	dist = 1.5*mean;   
 	printf("\nThe dist for the gesture is %f\n", dist);
 
 
@@ -305,7 +318,7 @@ void gesture::lin_intra(int med, int samp_count, double *featureVec, float euler
 }
 
 	
-float gesture::calcDistance(double feature[120]) {
+float gesture::calcDistance(double feature[90]) {
 
 double dif[Count*6]={0};
 	float distance =  0 ;
@@ -334,7 +347,7 @@ void gesture::norm(double *feature) {
 		feature[i] = feature[i] /distance;
 	}
 }
-void gesture::compare(int train_gest_count) {
+void gesture::compare(int train_gest_count,int delete_count) {
 	float dist_test_gest = 0;
 
 
@@ -356,14 +369,17 @@ void gesture::compare(int train_gest_count) {
 	}
 	f >> j;
 	f.close();
-	for (int i = 1; i <= train_gest_count; i++)
+	for (int i = 1; i <= (train_gest_count+delete_count); i++)
 	{
 		string s = "gesture"+to_string(i);
-		id = j[s]["id"];
-		
-		for (int i = 0; i < 6*Count; i++)
+
+		try{ id = j[s]["id"]; }
+		catch (...) {
+			continue;
+		}
+		for (int k = 0; k < 6*Count; k++)
 		{
-			feature[i] = (double)j[s]["featureVec"][i];
+			feature[k] = (double)j[s]["featureVec"][k];
 		}
 		
 		distance = j[s]["distance"];

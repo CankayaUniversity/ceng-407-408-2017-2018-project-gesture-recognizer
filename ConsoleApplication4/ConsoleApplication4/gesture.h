@@ -11,11 +11,11 @@ public:
 	gesture(double *featureVector,float distance,int id);
 	void gesture_calib(double calibration[3]);
 	bool saveGest(); //saveGest is responsible to store the data related with gesture 
-	void compare(int train_gest_count); //Compare is responsible to classify the gesture by comparing template and the gesture.It returns the id number of the 
+	void compare(int train_gest_count,int delete_count); //Compare is responsible to classify the gesture by comparing template and the gesture.It returns the id number of the 
 	//gesture if it recognized.The gesture numbers starts with 1.If no match it returns 0.
 	void detect();// Detect is responsible for creating template.
 	//int findmedian(int *samp_count); //finds median of the sample_counts
-	float calcDistance(double feature[120]);
+	float calcDistance(double feature[90]);
 	//void intra(int med, int samp_count, double featureVec[][6000], float euler[][6000]);
 	int getId() { return gest_id; }
 	void lin_intra(int med, int samp_count, double *featureVec, float euler[6000]);
@@ -27,7 +27,7 @@ private:
 	float acc[3][6000];
 	int gest_id;
 	double duration;
-	double featureVec[120] ;
+	double featureVec[90] ;
 	float dist;
 	double calib[3];
 	struct Candidates {
