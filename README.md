@@ -26,4 +26,3 @@ Method name can be train , test and delete.
 
 The serial port name will be something like COM3, COM4,COM5.User should check the serial port every time he/she connects sensor to the computer.It can be checked from Computer Management >> Device Manager >> Ports >> Usb Serial Device( Port name is written here) in Windows 10.
 
-[![image](https://i.hizliresim.com/8z0XBd.png)](https://hizliresim.com/8z0XBd)
