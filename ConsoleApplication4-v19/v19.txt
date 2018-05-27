@@ -1,0 +1,4 @@
+6 farklý distance üstünden eleme yapýlmaya baþlandý.
+Adaylar arasýnda total distance üzerinden farklar ölçülmeye baþlandý.
+
+---v16 ve sonrasýnýn update edilmesi için repo nun  historysini silmem gerekti---

@@ -9,7 +9,7 @@
 
 using json = nlohmann::json;
 using namespace std;
-#define Count 15
+#define Count 20
 #define sample 5
 gesture::gesture(double calibration[3], string serial_device) {
 	sensor Sensor(serial_device);
@@ -20,14 +20,18 @@ gesture::gesture(double calibration[3], string serial_device) {
 		exit(0);
 	}
 	samp_count = Sensor.syn_read_ascii(Sensor.BAUDRATE, euler, acc,calibration) + 1;
+
+	
+
+
 	duration = ((double)samp_count) / 100;
 
 	for (int j = 0; j < 3; j++) {
 		lin_intra(Count, samp_count, (featureVec + j * Count), euler[j]);
 		lin_intra(Count, samp_count, (featureVec + Count * (j + 3)), acc[j]);
 	}
-	//featureVec[Count*6] = duration;
-	norm(featureVec);
+	log_acc(featureVec);
+	
 }
 gesture::gesture(int id, double calibration[3], string serial_device) {
 	for  (int i = 0;  i < Count*6;  i++)
@@ -47,9 +51,12 @@ gesture::gesture(int id, double calibration[3], string serial_device) {
 	calib[2] = calibration[2];
 }
 
-gesture::gesture(double *feature, float distance, int id) {
+gesture::gesture(double *feature, float *distance, int id) {
 	copy(feature,  feature+ (6 * Count), featureVec);
-	dist = distance;
+	for (int i = 0; i < 6; i++)
+	{
+		dist[i] = distance[i];
+	}
 	gest_id = id;
 
 }
@@ -68,7 +75,7 @@ void gesture::gesture_calib(double calibration[3],string serial_dev) {
 bool gesture::saveGest() { 
 	try {
 		json j;
-		ifstream f("gesture.json");
+		ifstream f("test.json");
 		if (f.peek() != std::ifstream::traits_type::eof())
 		{
 			f >> j;
@@ -79,9 +86,13 @@ bool gesture::saveGest() {
 		s = s + num;
 			
 			j[s]["id"] = gest_id;
-			j[s]["distance"] = dist;
+			for (int i = 0; i < 6; i++)
+			{
+				string s2 = to_string(i);
+				j[s]["distance"][s2] = dist[i];
+			}
 			j[s]["featureVec"] = vector<double>(featureVec, featureVec + Count*6);
-			ofstream f2("gesture.json");
+			ofstream f2("test.json");
 			f2 << j;
 			f2.close();
 		
@@ -95,7 +106,7 @@ bool gesture::saveGest() {
 
 void gesture::detect(string serial_device) {
 	sensor Sensor(serial_device);
-	double euler_sample_count = 0; 
+	double euler_sample_count = 0;
 	float euler[sample][3][6000];
 	float accel[sample][3][6000];
 	double feature_arr[sample][6 * Count];
@@ -103,18 +114,18 @@ void gesture::detect(string serial_device) {
 	int samp_count[sample];
 
 	cout << "Detect mode is on!!!\n";
-	printf("You should enter your gesture at least %d times\n",sample);
+	printf("You should enter your gesture at least %d times\n", sample);
 	//cout << "You should enter your gesture at least "+sample+" times\n";
 	string check;
 	for (int i = 0; i < sample; i++)
 	{
 		cout << "Press 4 to start your gesture\n";
 		cin >> check;
-		
-		if (check=="4")
+
+		if (check == "4")
 		{
 			//taking sensor values
-			euler_sample_count = Sensor.syn_read_ascii(Sensor.BAUDRATE, euler[i], accel[i],calib) + 1;
+			euler_sample_count = Sensor.syn_read_ascii(Sensor.BAUDRATE, euler[i], accel[i], calib) + 1;
 
 			printf("\n-----------------------------end-----------------------------------of----------------------------------%dth gesture.\n", i + 1);
 
@@ -123,8 +134,8 @@ void gesture::detect(string serial_device) {
 			avg_duration += (euler_sample_count / 100); //total duration.
 
 		}
-		
-	
+
+
 	}
 
 	//avg duration training modundaki gesturelarda duration da tutuluyor.
@@ -134,7 +145,7 @@ void gesture::detect(string serial_device) {
 
 	//int med = findmedian(samp_count);
 	//featureVec_sample_count = Count;
-	double interpolated[Count*6];
+	double interpolated[Count * 6];
 	for (int i = 0; i < sample; i++)
 	{
 		for (int j = 0; j < 3; j++) {
@@ -147,11 +158,13 @@ void gesture::detect(string serial_device) {
 		{
 			featureVec[i] += interpolated[i];
 		}
-		
+
 		//holds the feature vector of each sample...
-		copy(interpolated, interpolated + Count*6, feature_arr[i]);
+		copy(interpolated, interpolated + Count * 6, feature_arr[i]);
 		//feature_arr[i][Count*6] = ((double)samp_count[i] / 100);
-		float m = 0;
+
+		//ivmenin logaritmik olarak deðiþtirilmesi
+		/*float m = 0;
 		int sign = 0;
 		for (int i = 0; i < Count * 3; i++)
 		{
@@ -161,42 +174,60 @@ void gesture::detect(string serial_device) {
 			m = abs(m);
 			featureVec[Count * 3 + i] = sign * log(1 + m);
 
-		}
-
-		norm(feature_arr[i]);
+		}*/
+		log_acc(feature_arr[i]);
+		//norm(feature_arr[i]);
 
 	}
-	
-	for (int i = 0; i <Count*6; i++)
+
+	for (int i = 0; i < Count * 6; i++)
 	{
 		featureVec[i] = featureVec[i] / 5;
-		
-	}
-	
-	//featureVec[Count*6] =avg_duration ;
-	norm(featureVec);
 
-	float max = 0;
-	float mean = 0;
-	float distance = 0;
+	}
+
+	//featureVec[Count*6] =avg_duration ;
+	//norm(featureVec);
+
+	float max[6] = { 0 };
+	float mean[6] = {0 };
+	//float distance = 0;
+	float distance[6];
 	for (int i = 0; i < sample; i++)
 	{
-		distance = calcDistance(feature_arr[i]);
-		if (max < distance) max = distance;
-		mean += distance;
-
-	} 
-	mean = mean / sample;
-	//dist = max + 0.5*mean;
-	dist = 1.5*mean;   
-	printf("\nThe dist for the gesture is %f\n", dist);
-
-
+		for (int j = 0; j <6; j++)
+		{
+			distance[j] = calcDistance(feature_arr[i],j);
+			if (max[j] < distance[j]) max[j] = distance[j];
+			mean[j] += distance[j];
+		}
+	
+	}
+	printf("\nThe dist for the gesture is\n");
+	for (int j = 0; j < 6; j++)
+	{
+		mean[j] = mean[j] / sample;
+		//dist = max + 0.5*mean;
+		dist[j] = max[j]+mean[j];
+		printf("%f\n", dist[j]);
+}
 	
 
 
 }
-		
+void gesture:: log_acc(double *feature){
+	float m = 0;
+	int sign = 0;
+	for (int i = 0; i < Count * 3; i++)
+	{
+		m = feature[Count * 3 + i];
+		if (m < 0) sign = -1;
+		else if (m >= 0) sign = 1;
+		m = abs(m);
+		feature[Count * 3 + i] = sign * log(1 + m);
+
+	}
+}
 
 
 void gesture::lin_intra(int med, int samp_count, double *featureVec, float euler[6000]) {
@@ -308,7 +339,40 @@ void gesture::lin_intra(int med, int samp_count, double *featureVec, float euler
 }
 
 	
-float gesture::calcDistance(double feature[90]) {
+float gesture::calcDistance(double feature[120],int position) {
+
+double dif[Count]={0};
+	float distance =  0 ;
+	int ind;
+			for (int i = 0; i < Count; i++)
+			{
+				ind = position * Count + i;
+				dif[i] = abs(feature[ind] - featureVec[ind]);
+
+			}
+			distance=pow_sqr(dif);
+		return distance;
+	}
+float gesture::pow_sqr(double *dif)
+{
+	float distance = 0;
+	for (int j = 0; j < Count ; j++) {
+		distance += pow(dif[j], 2);
+	}
+	distance = sqrt(distance);
+	return distance;
+}
+/*float gesture::pow_sqr(double *dif)
+{
+	float distance = 0;
+	for (int j = 0; j < Count * 6 ; j++) {
+		distance += pow(dif[j], 2);
+	}
+	distance = sqrt(distance);
+	return distance;
+}*/
+
+/*float gesture::calcDistance(double feature[15]) {
 
 double dif[Count*6]={0};
 	float distance =  0 ;
@@ -329,93 +393,129 @@ float gesture::pow_sqr(double *dif)
 	}
 	distance = sqrt(distance);
 	return distance;
-}
-void gesture::norm(double *feature) {
-	float distance = pow_sqr(feature);
-	for (int i = 0; i <Count*6; i++)
-	{
-		feature[i] = feature[i] /distance;
-	}
-}
-void gesture::compare(int train_gest_count, int delete_count) {
+}*/
+
+
+//void gesture::norm(double *feature) {
+//	float distance = pow_sqr(feature);
+//	for (int i = 0; i <Count*6; i++)
+//	{
+//		feature[i] = feature[i] /distance;
+//	}
+//}
+void gesture::compare(int train_gest_count,int delete_count) {
 	float dist_test_gest = 0;
 
 
 
 	//test.json  dan train gesturelarýný geri yüklüyoruz..
 	vector<gesture> Train_Gest;
-
-	double feature[Count * 6] = { 0 };
-
+	
+	double feature[Count*6] = { 0 };
+	
 	int id;
-	float distance;
-	float dist_to_train;
+	float distance[6];
+	float dist_to_train[6];
 	json j;
-	ifstream f("gesture.json");
+	ifstream f("test.json");
 	if (f.peek() == std::ifstream::traits_type::eof())
 	{
 		cout << "No train mode gestures.To use test mode, you should save the gesture in the train mode/n";
 		exit(0);
 	}
-	else {
-		f >> j;
-		f.close();
-		for (int i = 1; i <= (train_gest_count + delete_count); i++)
+	f >> j;
+	f.close();
+	for (int i = 1; i <= (train_gest_count+delete_count); i++)
+	{
+		string s = "gesture"+to_string(i);
+
+		try{ id = j[s]["id"]; }
+		catch (...) {
+			continue;
+		}
+		for (int k = 0; k < 6*Count; k++)
 		{
-			string s = "gesture" + to_string(i);
-
-			try { id = j[s]["id"]; }
-			catch (...) {
-				continue;
-			}
-			for (int k = 0; k < 6 * Count; k++)
-			{
-				feature[k] = (double)j[s]["featureVec"][k];
-			}
-
-			distance = j[s]["distance"];
-			Train_Gest.push_back(gesture(feature, distance, id));
+			feature[k] = (double)j[s]["featureVec"][k];
 		}
-
-		struct Candidates *cand = (struct Candidates*)malloc(train_gest_count * sizeof(struct Candidates));
-		for (int i = 0; i < train_gest_count; i++)
+		for (int i = 0; i < 6; i++)
 		{
-			cand[i].val = 0;
+			string s2 = to_string(i);
+			distance[i] = j[s]["distance"][s2];
 		}
-		int count_of_candidates = 0;
-		for (int i = 0; i < train_gest_count; i++)
-		{
-			gesture g = Train_Gest.at(i);
-			dist_to_train = calcDistance(g.featureVec);
-			printf("%lf\n", dist_to_train);
-			if (g.dist > dist_to_train) {
-				cand[i].val = 1; cand[i].dist = dist_to_train; count_of_candidates++;
-				cand[i].id = g.getId();
-			}
-		}
-		if (count_of_candidates == 1) {
-			cout << "A match is found for your gesture\n";
-			for (int i = 0; i < train_gest_count; i++)
-			{
-				if (cand[i].val == 1)		printf("The id of the gesture is %d and the distance from train feature vector is %f\n", cand[i].id, cand[i].dist);
-			}
-		}
-		else if (count_of_candidates == 0) { cout << "No match for your gesture\n"; }
-		else { //at least 2
-			struct Candidates min;
-			min.dist = 100000;
-			for (int i = 0; i < train_gest_count; i++)
-			{
-				if (cand[i].val == 1)
-					/*if (min.dist > cand[i].dist)
-					{
-						min.dist = cand[i].dist;
-						min.id = cand[i].id;
-					}*/
-					printf("The id of the gesture is %d and the distance from train feature vector is %f\n", cand[i].id, cand[i].dist);
-			}
+		Train_Gest.push_back(gesture(feature, distance, id));
+	}
 
-			/*printf("The id of the gesture is %d and the distance from train feature vector is %f\n", min.id, min.dist);*/
+	struct Candidates *cand = (struct Candidates*)malloc(train_gest_count * sizeof(struct Candidates));
+	for (int i = 0; i < train_gest_count; i++)
+	{
+		cand[i].val = 0;
+	}
+	int count_of_candidates = 0;
+	int counter ;
+	for (int i = 0; i < train_gest_count; i++)
+	{
+		counter = 0;
+		gesture g = Train_Gest.at(i);
+		printf("The distance for the %dth gesture : \n", i + 1);
+		for (int j = 0; j < 6; j++)
+		{
+			dist_to_train[j] = calcDistance(g.featureVec,j);
+			printf("%lf\n", dist_to_train[j]);
+			if (g.dist[j] > dist_to_train[j]) counter++;
+		}
+		if (counter>=5) {
+			cand[i].val = 1; 
+			for (int j = 0; j < 6; j++)
+			{
+				cand[i].dist[j] = dist_to_train[j];
+			}
+			count_of_candidates++;
+			cand[i].id = g.getId();
 		}
 	}
+	if (count_of_candidates == 1) {
+		cout << "A match is found for your gesture\n";
+		for (int i = 0; i < train_gest_count; i++)
+		{
+			if (cand[i].val == 1) {
+				printf("The id of the gesture is %d and the distance from train feature vector is \n", cand[i].id);
+				for (int j = 0; j < 6; j++)
+				{
+					printf("%f\n", cand[i].dist[j]);
+				}
+			}
+		}
+	}
+	else if (count_of_candidates == 0) { cout << "No match for your gesture\n"; }
+	else { //at least 2
+		struct Candidates min;
+		double min_dist = 100000;
+		for (int i = 0; i < train_gest_count; i++)
+		{
+			if (cand[i].val == 1)
+			{
+				double dist = 0;
+				dist = cand[i].dist[0] + cand[i].dist[1] + cand[i].dist[2] + 0.5*(cand[i].dist[3] + cand[i].dist[4] + cand[i].dist[5]);
+				if (min_dist > dist)
+				{
+					min_dist = dist;
+					for (int j = 0; j < 6; j++)
+					{
+						min.dist[j] = cand[i].dist[j];
+					}
+					min.id = cand[i].id;
+				}
+			}
+		}
+				printf("The id of the gesture is %d and the distance from train feature vector is \n", min.id);
+				for (int j = 0; j < 6; j++)
+				{
+					printf("%f\n", min.dist[j]);
+				}
+			
+		
+
+		/*printf("The id of the gesture is %d and the distance from train feature vector is %f\n", min.id, min.dist);*/
+	}
 }
+
